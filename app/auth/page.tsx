@@ -1,177 +1,130 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { supabase } from "@/lib/supabase"
-import { useRouter } from "next/navigation"
+import { supabase } from "../../lib/supabase"
 
 export default function AuthPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [username, setUsername] = useState("")
-  const [fullName, setFullName] = useState("")
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
-  const router = useRouter()
+  const [error, setError] = useState("")
 
-  const handleSignUp = async () => {
+  const handleSignUp = async (formData: FormData) => {
     setLoading(true)
     setMessage("")
+    setError("")
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const email = formData.get("email") as string
+      const password = formData.get("password") as string
+      const fullName = formData.get("fullName") as string
+      const username = formData.get("username") as string
+
+      // Step 1: Create user in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            username,
             full_name: fullName,
+            username: username,
           },
         },
       })
 
-      if (error) throw error
+      if (authError) {
+        throw authError
+      }
 
-      if (data.user) {
-        // Create profile
+      // Step 2: Create profile record (only if auth was successful)
+      if (authData.user) {
         const { error: profileError } = await supabase.from("profiles").insert({
-          id: data.user.id,
-          username,
+          id: authData.user.id, // Use the auth user's ID
+          username: username,
           full_name: fullName,
-          avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+          avatar_url: null,
         })
 
-        if (profileError) throw profileError
-
-        setMessage("Account created successfully! Please check your email to verify.")
+        if (profileError) {
+          throw profileError
+        }
       }
+
+      setMessage("Account created successfully! Check your email to verify.")
     } catch (error: any) {
-      setMessage(error.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSignIn = async () => {
-    setLoading(true)
-    setMessage("")
-
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) throw error
-
-      router.push("/")
-    } catch (error: any) {
-      setMessage(error.message)
+      setError(`Error: ${error.message}`)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-center text-2xl font-bold text-blue-600">Swap & Learn</CardTitle>
-          <p className="text-center text-gray-600">Join the real-time learning community</p>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
-            </TabsList>
+    <div className="container mx-auto py-10">
+      <h1 className="text-2xl font-bold text-center mb-6">Create an Account</h1>
+      <form action={handleSignUp} className="space-y-4 max-w-md mx-auto p-6">
+        <div>
+          <label htmlFor="fullName" className="block text-sm font-medium">
+            Full Name
+          </label>
+          <input
+            id="fullName"
+            name="fullName"
+            type="text"
+            required
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+          />
+        </div>
 
-            <TabsContent value="signin" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                />
-              </div>
-              <Button onClick={handleSignIn} disabled={loading} className="w-full">
-                {loading ? "Signing In..." : "Sign In"}
-              </Button>
-            </TabsContent>
+        <div>
+          <label htmlFor="username" className="block text-sm font-medium">
+            Username
+          </label>
+          <input
+            id="username"
+            name="username"
+            type="text"
+            required
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+          />
+        </div>
 
-            <TabsContent value="signup" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Enter your full name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Choose a username"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Create a password"
-                />
-              </div>
-              <Button onClick={handleSignUp} disabled={loading} className="w-full">
-                {loading ? "Creating Account..." : "Sign Up"}
-              </Button>
-            </TabsContent>
-          </Tabs>
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium">
+            Email
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+          />
+        </div>
 
-          {message && (
-            <div
-              className={`mt-4 p-3 rounded text-sm ${
-                message.includes("successfully") ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-              }`}
-            >
-              {message}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        <div>
+          <label htmlFor="password" className="block text-sm font-medium">
+            Password
+          </label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            required
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50"
+        >
+          {loading ? "Creating Account..." : "Sign Up"}
+        </button>
+
+        {message && <div className="p-3 rounded-md bg-green-100 text-green-700">{message}</div>}
+
+        {error && <div className="p-3 rounded-md bg-red-100 text-red-700">{error}</div>}
+      </form>
     </div>
   )
 }
